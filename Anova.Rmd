@@ -1,0 +1,88 @@
+---
+title: "ANOVA"
+author: "Кульгаева А."
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(multcomp)
+```
+
+```{r data}
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>% 
+    mutate(Position = as.factor(Position), 
+    Nationality = as.factor(Nationality), 
+    Age = as.numeric(Age), 
+    Height = as.numeric(Height)
+) %>% 
+filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian")) 
+
+set.seed(1) 
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>% 
+    mutate(Nationality = factor(Nationality))
+
+```
+
+# Дисперсионный анализ
+
+Классический
+
+```{r}
+aov(Height ~ Position, data = soccer_wrk) %>% summary
+```
+
+С поправкой Вэлша
+
+```{r}
+oneway.test(Height ~ Position, data = soccer_wrk)
+```
+
+**В обоих случаях p << 0.01, т.о. нулевая гипотеза об отсутствии связи между ростом спортсмена и его позицией отвергается на уровне значимости a=0.05. Т.е. среди групп существует хотя бы одна такая пара, в которой средние значения роста статистически значимо различаются.**
+
+# Процедура Хоторна-Бретца-Вестфалла
+
+```{r}
+lm(Height ~ Position, data = soccer_wrk) %>%  glht(linfct = mcp(Position = "Tukey")) %>% summary()
+lm(Height ~ Position, data = soccer_wrk) %>%  glht(linfct = mcp(Position = "Tukey")) %>% confint()
+```
+
+**Процедура Хоторна-Бретца-Вестфалла выявила статистически значимые различия между среднеми значениями роста 4-х попарных сравнений: Goalkeeper - Defender (p ~ 0.003), Midfielder - Defender (p ~ 0.002), Goalkeeper - Forward (p < 0.001), Midfielder - Goalkeeper (p < 0.001).**
+
+# Сравнение с предыдущим домашним заданием
+
+**Дисперсионный анализ подтвердил наличие значимо различающихся между собой групп в выборке, процедура Хоторна-Бретца-Вестфалла выделила те же значимые различия между группами, что и попарный t-тест с поправками и без них. Все рассчитанные доверительные интервалы покрыли истинную разницу средних в ГС.**
+
+
+# Повтор анализа для групп по странам
+
+## Дисперсионный анализ
+
+Классический
+
+```{r}
+aov(Height ~ Nationality, data = soccer_wrk) %>% summary
+```
+
+С поправкой Вэлша
+
+```{r}
+oneway.test(Height ~ Nationality, data = soccer_wrk)
+```
+**Оба анализа говорят о невозможности отвергнуть нулевую гипотезу и об отсутствии различий хотя бы между одной парой групп по национальной принадлежности. Но, на всякий случай, перепроверим.**
+
+## Процедура Хоторна-Бретца-Вестфалла
+
+```{r}
+lm(Height ~ Nationality, data = soccer_wrk) %>%  glht(linfct = mcp(Nationality = "Tukey")) %>% summary()
+lm(Height ~ Nationality, data = soccer_wrk) %>%  glht(linfct = mcp(Nationality = "Tukey")) %>% confint()
+```
+
+**Действительно, ни одна из групп статистически значимо не различается с другой на уровне значимости a=0.05**

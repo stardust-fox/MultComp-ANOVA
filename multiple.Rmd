@@ -1,0 +1,117 @@
+---
+title: "Multiple Comparisons"
+author: "Кульгаева А."
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r data}
+soccer_general <- read.csv("soccer.csv", sep=";")[, 2:6] %>% 
+    mutate(Position = as.factor(Position), 
+    Nationality = as.factor(Nationality), 
+    Age = as.numeric(Age), 
+    Height = as.numeric(Height)
+) %>% 
+filter(Nationality %in% c("Spanish", "Italian", "German", "English", "Argentinian")) 
+
+
+set.seed(1) 
+
+
+soccer_wrk <- soccer_general[sample(1:nrow(soccer_general), 150), ] %>% 
+    mutate(Nationality = factor(Nationality), Position = factor(Position))
+```
+
+# Выделение рабочих подмножеств по позициям на поле
+
+```{r}
+Def <- soccer_wrk %>% filter(Position == "Defender")
+Forw <- soccer_wrk %>% filter(Position == "Forward")
+Goal <- soccer_wrk %>% filter(Position == "Goalkeeper")
+Mid <- soccer_wrk %>% filter(Position == "Midfielder")
+```
+
+
+# Вычисление истинного среднего разниц между группами
+
+```{r}
+def <- soccer_general %>% filter(Position == "Defender") %>% pull(Height) %>% mean(na.rm = TRUE) %>% round(.,2)
+
+forw <- soccer_general %>% filter(Position == "Forward") %>% pull(Height) %>% mean(na.rm = TRUE) %>% round(.,2)
+
+goal <- soccer_general %>% filter(Position == "Goalkeeper") %>% pull(Height) %>% mean(na.rm = TRUE) %>% round(.,2)
+
+mid <- soccer_general %>% filter(Position == "Midfielder") %>% pull(Height) %>% mean(na.rm = TRUE) %>% round(.,2)
+
+
+diff_def_forw <- round(def - forw,2)
+
+diff_def_goal <- round(def - goal,2)
+
+diff_def_mid <- round(def - mid,2)
+
+diff_forw_goal <- round(forw - goal,2)
+
+diff_forw_mid <- round(forw - mid,2)
+
+diff_goal_mid <- round(goal - mid,2)
+
+x <- c(diff_def_forw,diff_def_goal,diff_def_mid, diff_forw_goal, diff_forw_mid, diff_goal_mid)
+
+```
+
+# ДИ для разницы средних между группами без и с поправкой Бонферрони
+
+```{r}
+#DEFENDERS vs FORWARDS true difference
+diff_def_forw
+t.test(Def$Height, Forw$Height, paired = FALSE)   #Defenders vs Forwards
+t.test(Def$Height, Forw$Height, paired = FALSE, conf.level = (1-0.05/6))  %>% with(conf.int) #Defenders vs Forwards Bonferroni
+
+#DEFENDERS vs GOALKEEPERS true difference
+diff_def_goal 
+t.test(Def$Height, Goal$Height, paired = FALSE)  #Defenders vs Goalkeepers
+t.test(Def$Height, Goal$Height, paired = FALSE, conf.level = 0.992) %>% with(conf.int) #Defenders vs Goalkeepers Bonferroni
+
+#DEFENDERS vs MIDFIELDERS true difference
+diff_def_mid
+t.test(Def$Height, Mid$Height, paired = FALSE)  #Defenders vs Midfielders
+t.test(Def$Height, Mid$Height, paired = FALSE, conf.level = 0.992) %>% with(conf.int) #Defenders vs Midfielders Bonferroni
+
+#FORWARDS vs GOALKEEPERS true difference
+diff_forw_goal 
+t.test(Forw$Height, Goal$Height, paired = FALSE) #Goalkeepers vs Forwards
+t.test(Forw$Height, Goal$Height, paired = FALSE, conf.level = 0.992)  %>% with(conf.int) #Goalkeepers vs Forwards Bonferroni
+
+#FORWARDS vs MIDFIELDERS true difference
+diff_forw_mid 
+t.test(Forw$Height, Mid$Height, paired = FALSE) #Midfielders vs Forwards
+t.test(Forw$Height, Mid$Height, paired = FALSE, conf.level = 0.992)  %>% with(conf.int) #Midfielders vs Forwards Bonferroni
+
+#GOALKEEPERS vs MIDFIELDERS true difference
+diff_goal_mid 
+t.test(Goal$Height, Mid$Height, paired = FALSE) #Goalkeepers vs Midfielders
+t.test(Goal$Height, Mid$Height, paired = FALSE, conf.level = 0.992)  %>% with(conf.int) #Goalkeepers vs Midfielders Bonferroni
+```
+**Все интервалы даже без поправки Бонферрони покрыли реальную разницу средних**
+
+
+# Попарные сравнения
+
+```{r}
+pairwise.t.test(soccer_wrk$Height, soccer_wrk$Position, p.adjust.method="none", pool.sd = F)
+pairwise.t.test(soccer_wrk$Height, soccer_wrk$Position, p.adjust.method="holm",  pool.sd = F)
+pairwise.t.test(soccer_wrk$Height, soccer_wrk$Position, p.adjust.method="BH",  pool.sd = F)
+```
+
+**Всего открытий 4: все три теста на уровне значимости a=0.05 признали разницу в росте между между Defender и Goalkeeper, Goalkeeper и Forward,  Defender и Midfielder, Midfielder и Goalkeeper. Ложных результатов не оказалось.**
